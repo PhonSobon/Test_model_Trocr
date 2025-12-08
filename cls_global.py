@@ -15,6 +15,7 @@ def gen_khmer_text_image(
 ):
     """
     Generate a text image with various augmentations for OCR training.
+    Image size is automatically calculated based on text content.
     
     Parameters:
     -----------
@@ -29,7 +30,7 @@ def gen_khmer_text_image(
     noise_level : str
         Noise level: 'none', 'low', 'medium', 'high'
     blur_level : int
-        Gaussian blur radius (0 = no blur)
+        Gaussian blur radius (0 = no blur, 2 = mild, 3 = moderate, 4 = strong)
     font_path : str
         Path to the font file
     font_size : int
@@ -50,33 +51,47 @@ def gen_khmer_text_image(
         return
     
     # Calculate text size using textbbox
+    # Create a temporary image to measure text
     dummy_img = Image.new('RGBA', (1, 1), bg)
     draw = ImageDraw.Draw(dummy_img)
     bbox = draw.textbbox((0, 0), content, font=font)
+    
+    # Calculate actual text dimensions
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
     
-    # Add padding
-    padding = 20
-    img_width = text_width + padding * 2
-    img_height = text_height + padding * 2
+    # Add dynamic padding based on font size
+    padding_horizontal = max(10, int(font_size * 0.5))
+    padding_vertical = max(10, int(font_size * 0.3))
+    
+    # Calculate image dimensions based on text
+    img_width = text_width + padding_horizontal * 2
+    img_height = text_height + padding_vertical * 2
+    
+    # Ensure minimum size
+    img_width = max(img_width, 50)
+    img_height = max(img_height, 30)
     
     # Create image with background color
     image = Image.new('RGBA', (img_width, img_height), bg)
     draw = ImageDraw.Draw(image)
     
+    # Calculate text position to center it
+    text_x = padding_horizontal - bbox[0]
+    text_y = padding_vertical - bbox[1]
+    text_position = (text_x, text_y)
+    
     # Draw text in black
-    text_position = (padding, padding)
     draw.text(text_position, content, font=font, fill=(0, 0, 0, 255))
     
     # Convert to RGB
     image = image.convert('RGB')
     
-    # Apply noise
+    # Apply noise based on noise_level
     if noise_level != 'none':
         image = add_noise(image, noise_level)
     
-    # Apply blur
+    # Apply blur based on blur_level
     if blur_level > 0:
         image = image.filter(ImageFilter.GaussianBlur(radius=blur_level))
     
@@ -88,6 +103,7 @@ def gen_khmer_text_image(
 def add_noise(image, noise_level):
     """
     Add random noise to an image.
+    Noise levels: 'low', 'medium', 'high'
     
     Parameters:
     -----------
@@ -106,16 +122,21 @@ def add_noise(image, noise_level):
     
     # Define noise intensity based on level
     noise_intensity_map = {
-        'low': 5,
-        'medium': 15,
-        'high': 30
+        'low': 5,      # Subtle noise
+        'medium': 15,  # Moderate noise
+        'high': 30     # Strong noise
     }
     
     noise_intensity = noise_intensity_map.get(noise_level, 0)
     
     if noise_intensity > 0:
         # Generate random noise
-        noise = np.random.randint(-noise_intensity, noise_intensity + 1, img_array.shape, dtype=np.int16)
+        noise = np.random.randint(
+            -noise_intensity, 
+            noise_intensity + 1, 
+            img_array.shape, 
+            dtype=np.int16
+        )
         
         # Add noise to image
         noisy_img = img_array.astype(np.int16) + noise
@@ -131,25 +152,45 @@ def add_noise(image, noise_level):
 def test_generation():
     """
     Test function to verify the image generation works correctly.
+    Tests all noise and blur combinations.
     """
-    print("Testing image generation...")
+    print("Testing image generation with different parameters...")
+    
+    # Test with different text lengths
+    test_texts = [
+        "ខ",           # Single character
+        "តេស្ត",       # Short word
+        "សូមស្វាគមន៍",  # Medium word
+        "នេះជាការសាកល្បងវែងបន្តិច"  # Longer sentence
+    ]
     
     # Test parameters
-    test_content = "តេស្ត"  # Khmer text for "test"
+    noise_levels = ["none", "low"]
+    blur_levels = [0]
     
-    gen_khmer_text_image(
-        index=1,
-        content=test_content,
-        data_type="test",
-        bg=(255, 255, 255, 255),  # White background
-        noise_level="medium",
-        blur_level=2,
-        font_path="fonts/KhmerOS.ttf",  # Make sure this font exists
-        font_size=16,
-        data_folder="test_output"
-    )
+    test_index = 1
     
-    print("Test image generated in test_output/test/1.png")
+    for text in test_texts:
+        for noise in noise_levels:
+            for blur in blur_levels:
+                print(f"Generating test {test_index}: text='{text[:10]}...', noise={noise}, blur={blur}")
+                
+                gen_khmer_text_image(
+                    index=test_index,
+                    content=text,
+                    data_type="test",
+                    bg=(255, 255, 255, 255),  # White background
+                    noise_level=noise,
+                    blur_level=blur,
+                    font_path="fonts/KhmerOS.ttf",  # Adjust path as needed
+                    font_size=16,
+                    data_folder="test_output"
+                )
+                
+                test_index += 1
+    
+    print(f"\n{test_index - 1} test images generated in test_output/test/")
+    print("Check the images to verify different sizes, noise, and blur levels!")
 
 
 if __name__ == "__main__":
