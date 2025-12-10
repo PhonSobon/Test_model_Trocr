@@ -1,2 +1,12 @@
 data-mptc/
 text-mptc/
+__pycache__/
+*.pyc
+.env
+.vscode/
+.ipynb_checkpoints/
+logs/
+checkpoints/
+output/
+
+.idea/
